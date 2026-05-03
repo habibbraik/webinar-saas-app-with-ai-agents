@@ -1,0 +1,149 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clerkId            String    @unique
+  email              String    @unique
+  name               String?   @db.VarChar(255)
+  profileImage       String?
+  webinar            Webinar[] @relation("PresenterWebinars")
+  stripeConnectId    String?   @db.VarChar(255)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+  stripeCustomerId   String?   @db.VarChar(255)
+  subscriptionStatus Boolean   @default(false)
+
+  @@index([clerkId])
+  @@index([email])
+}
+
+enum WebinarStatusEnum {
+  SCHEDULED
+  WAITING_ROOM
+  LIVE
+  ENDED
+  CANCELED
+}
+
+enum CtaTypeEnum {
+  BUY_NOW
+  BOOK_A_CALL
+}
+
+enum AttendanceStatusEnum {
+  REGISTERED
+  ATTENDED
+  ADDED_TO_CART
+  FOLLOW_UP
+  BREAK_OUT_ROOM
+  CONVERTED
+}
+
+enum CallStatusEnum {
+  PENDING
+  COMPLETED
+  CANCELED
+}
+
+enum AppointmentStatusEnum {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+model Appointment {
+  id            String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerName  String                @db.VarChar(255)
+  customerPhone String                @db.VarChar(50)
+  customerEmail String?               @db.VarChar(255)
+  date          DateTime
+  time          String                @db.VarChar(10)
+  serviceType   String                @db.VarChar(255)
+  status        AppointmentStatusEnum @default(PENDING)
+  notes         String?               @db.Text
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([date])
+  @@index([status])
+  @@index([customerPhone])
+}
+
+model Webinar {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title           String            @db.VarChar(255)
+  description     String            @db.Text
+  startTime       DateTime?
+  endTime         DateTime?
+  duration        Int               @default(0) // Duration in minutes
+  webinarStatus   WebinarStatusEnum @default(SCHEDULED)
+  presenterId     String            @db.Uuid
+  presenter       User              @relation("PresenterWebinars", fields: [presenterId], references: [id], onDelete: Cascade)
+  attendances     Attendance[]
+  tags            String[]
+  ctaLabel        String?           @db.VarChar(100)
+  ctaType         CtaTypeEnum
+  ctaUrl          String?           @db.VarChar(255)
+  couponCode      String?           @db.VarChar(50)
+  couponEnabled   Boolean           @default(false)
+  couponExpiry    DateTime?
+  lockChat        Boolean           @default(false)
+  stripeProductId String?           @db.VarChar(255)
+  aiAgentId       String?           @db.Uuid
+  priceId         String?           @db.VarChar(255)
+  recordingUrl    String?
+  thumbnail       String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?
+  Attendee        Attendee?         @relation(fields: [attendeeId], references: [id])
+  attendeeId      String?           @db.Uuid
+
+  @@index([presenterId])
+  @@index([aiAgentId])
+  @@index([startTime])
+}
+
+model Attendee {
+  id         String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email      String         @unique
+  name       String?        @db.VarChar(100)
+  callStatus CallStatusEnum @default(PENDING)
+  Webinar    Webinar[]
+  attendance Attendance[]
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+}
+
+model Attendance {
+  id             String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  webinarId      String               @db.Uuid
+  attendeeId     String               @db.Uuid
+  status         AttendanceStatusEnum @default(REGISTERED)
+  registeredAt   DateTime             @default(now())
+  attendedAt     DateTime?
+  addedToCartAt  DateTime?
+  followUpAt     DateTime?
+  breakOutRoomAt DateTime?
+  convertedAt    DateTime?
+
+  webinar  Webinar  @relation(fields: [webinarId], references: [id], onDelete: Cascade)
+  attendee Attendee @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
+
+  @@index([webinarId])
+  @@index([attendeeId])
+}
